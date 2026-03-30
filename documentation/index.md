@@ -21,3 +21,9 @@ Welcome to the internal documentation for the Animal Legislation Tracker project
 
 - [Phase 6: Decoupled Relevance Score](phase6_final_bug_fixes_and_relevance_score.md)
   *Decoupled 100-point algorithm determining urgency via Keyword Density, Committees, and Sponsor History.*
+
+---
+
+- [Thinking, Approach & Mission](thinking_approach.md)
+  *The product vision, user personas, real-world deployment model, and the architectural rationale behind decoupling LLM classification from deterministic scoring.*
+
