@@ -2,7 +2,8 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, ScrollText, FileText, PawPrint, Zap } from "lucide-react";
 import { useState } from "react";
-import { runPipeline } from "@/services/api";
+import { getPipelineStatus, runPipeline } from "@/services/api";
+
 import { PipelineOverlay } from "../ui/pipeline-overlay";
 import { RunPipelineModal } from "../ui/run-pipeline-modal";
 
@@ -23,18 +24,29 @@ export function Navbar() {
     setPipelineState("running");
     try {
       const result = await runPipeline(states.join(","), timeframe);
-      setPipelineState("complete");
-
-      const totalNew = result?.result?.total_new ?? 0;
-
-      setTimeout(() => {
-        setPipelineState("idle");
-        if (totalNew > 0) {
-          navigate("/bills?recent=true");
-        } else {
-          window.location.reload();
+      
+      // Since it runs in the background, we poll until done.
+      const pollInterval = window.setInterval(async () => {
+        try {
+          const statusRes = await getPipelineStatus();
+          // The pipeline script resets is_running to false and progress to 100 when gracefully done
+          if (!statusRes.is_running && statusRes.progress === 100) {
+            window.clearInterval(pollInterval);
+            setPipelineState("complete");
+            setTimeout(() => {
+              setPipelineState("idle");
+              // Re-fetch bills by reloading the Dashboard / Bills page
+              window.location.reload();
+            }, 2000);
+          } else if (!statusRes.is_running && statusRes.progress === 0 && statusRes.message.toLowerCase().includes("fail")) {
+            window.clearInterval(pollInterval);
+            setPipelineState("error");
+            setTimeout(() => setPipelineState("idle"), 3000);
+          }
+        } catch (e) {
+          console.error("Error polling pipeline status", e);
         }
-      }, 1500);
+      }, 2000);
     } catch (err) {
       console.error("Pipeline failed:", err);
       setPipelineState("error");

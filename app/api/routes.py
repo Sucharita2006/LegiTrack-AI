@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, BackgroundTasks
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -150,18 +150,29 @@ async def download_digest(
 
 @router.post("/run-pipeline")
 async def trigger_pipeline(
+    background_tasks: BackgroundTasks,
     states: Optional[str] = Query(None, description="Comma-separated state codes"),
     force: bool = Query(False, description="Force re-fetch all bills"),
     timeframe: str = Query("30d", description="Timeframe to fetch: '24h', '30d', or 'all'"),
 ):
-    """Trigger the data pipeline manually."""
+    """Trigger the data pipeline manually in the background to avoid timeouts."""
+    if pipeline_progress["is_running"]:
+        return {"status": "already_running", "message": "Pipeline is already running."}
+
+    # Synchronously mark as running to avoid race conditions before background task fires
+    pipeline_progress["is_running"] = True
+    pipeline_progress["progress"] = 0
+    pipeline_progress["message"] = "Starting requested pipeline in background..."
+
     state_list = states.split(",") if states else None
     try:
-        result = await run_pipeline(states=state_list, force_refresh=force, timeframe=timeframe)
-        return {"status": "completed", "result": result}
+        background_tasks.add_task(run_pipeline, states=state_list, force_refresh=force, timeframe=timeframe)
+        return {"status": "started", "message": "Pipeline initiated in background."}
     except Exception as e:
-        logger.error("Pipeline error: %s", str(e))
-        raise HTTPException(status_code=500, detail=f"Pipeline failed: {str(e)}")
+        pipeline_progress["is_running"] = False
+        pipeline_progress["message"] = f"Failed to start: {str(e)}"
+        logger.error("Pipeline start error: %s", str(e))
+        raise HTTPException(status_code=500, detail=f"Pipeline start failed: {str(e)}")
 
 
 @router.get("/run-pipeline/status")

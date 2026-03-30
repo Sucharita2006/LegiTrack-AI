@@ -89,7 +89,11 @@ class Settings(BaseSettings):
     # ── App ────────────────────────────────────────────────────────
     app_title: str = "Animal Legislation Tracker"
     app_version: str = "1.0.0"
-    cors_origins: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    cors_origins: List[str] = [
+        "http://localhost:5173", 
+        "http://localhost:3000", 
+        "https://legi-track-ai.vercel.app"
+    ]
 
 
 settings = Settings()

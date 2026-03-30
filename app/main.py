@@ -28,6 +28,15 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Startup / shutdown tasks."""
     logger.info("Starting %s v%s", settings.app_title, settings.app_version)
+    
+    # Download required NLTK data for production environment (Render)
+    import nltk
+    try:
+        nltk.download("punkt", quiet=True)
+        nltk.download("punkt_tab", quiet=True)
+        logger.info("NLTK 'punkt' and 'punkt_tab' datasets are ready.")
+    except Exception as e:
+        logger.warning("Failed to download NLTK data: %s", e)
     await init_db()
     logger.info("Database initialized.")
 
